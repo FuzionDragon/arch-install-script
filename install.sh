@@ -3,32 +3,60 @@
 #
 # Arch Linux Installation
 #
-
+# You are currently running a Bash install script for Arch Linux.
+#
+# Ensure this script in ran on either a VM or a fresh install of Arch Linux before you decide to use it.
+#
+# The decisions made for this script are primarily for an opinionated installation and configuration of a single boot Arch Linux install.
+#
+# I personally don't need to be careful of a separate boot (like Windows), and so this script could damage or wipe any existing operating systems on the chosen disks.
+#
+# It aims to be minimal and efficient, requiring as little user input as possible to achieve an installation that I would typically use.
+#
 #
 # Checklist (based on Arch wiki guide)
-# - Keymaps
-# - Encyption Option
-# - Password and Login
-# - Internet
+# - Encyption Option (Disk formatting option)
 # - System Clock
-# - Disk Picker / Partitioning
-# - Disk Formatting
-# - Disk Mounting
-# - Root and Fstab
 # - Localization
 # - Time
 # - Network Config
-# - Root Password
 # - Bootloader (probably just Grub)
 #
 # After the last step, reboot. From there, the user can run the config setup script (or run it from here as an option)
 #
-# make use of the 'less' command
-#
 
+main() {
+  echo "You are currently running a Bash install script for Arch Linux."
+  echo "Ensure this system is either a VM or a fresh install of Arch Linux before you decide to use it."
+  echo "The decisions made for this script are primarily for an opinionated installation and configuration of a single boot Arch Linux install."
+  echo "It aims to be minimal and efficient, requiring minimal user input to "
+}
+
+# Based on my typical hardware, setup, and locale needs
+# Could be changed in the future but these are my defaults and what I would typically do during setup
+# Could make encryption be optional, but will make it a default
 #
-# Keymaps
+# Some settings require user input due to security reasons
 #
+# Will also setup the new install with my personal configs
+#
+full_auto_setup() {
+  disk_formatting
+
+  echo "TwoFace" > /etc/hostname
+
+  set_user_details
+  setup_internet
+
+  setup_package_configs
+  configure_pacman
+
+  setup_root
+  chroot /mnt
+
+  localectl set-keymap uk
+  localectl set-locale LANG=en_GB.utf-8
+}
 
 set_keymap() {
   keymaps=$(localectl list-keymaps)
@@ -45,7 +73,7 @@ set_keymap() {
 
   while true; do
     read -p "Do you want to see the list of keymaps? (y/N): " answer
-    if [ $answer -eq "y" ] || [ $answer -eq "Y" ];
+    if [ $answer = "y" ] || [ $answer = "Y" ];
       echo "Listing valid keymaps"
       echo "Use Up / Down arrows to scroll, press 'q' to exit"
       $keymaps | less
@@ -55,6 +83,7 @@ set_keymap() {
     in_list=$($keymaps | grep -Fxq $selected_keymap && echo 1 || echo 0)
     if [ $in_list -eq 1 ];
       echo "Valid keymap selected"
+      echo "KEYMAP=$selected_keymap" > /etc/vconsole.conf
       localectl set-keymap $selected_keymap
     else
       echo "Invalid keymap entered, try again"
@@ -62,6 +91,7 @@ set_keymap() {
   done
 }
 
+# requires chroot into arch install first
 set_locale() {
   locales=$(localectl list-locales)
   current_locale=$(localectl | grep "System Locale" | awk -F ': ' '{print $2}')
@@ -77,7 +107,7 @@ set_locale() {
 
   while true; do
     read -p "Do you want to see the list of locales? (y/N): " answer
-    if [ $answer -eq "y" ] || [ $answer -eq "Y" ];
+    if [ $answer = "y" ] || [ $answer = "Y" ];
       echo "Listing locales options"
       echo "Use Up / Down arrows to scroll, press 'q' to exit"
       $locales | less
@@ -87,6 +117,9 @@ set_locale() {
     in_list=$($locales | grep -Fxq $selected_locale && echo 1 || echo 0)
     if [ $in_list -eq 1 ];
       echo "Valid locale selected"
+      sed --in-place 's/#$selected_locale/$selected_locale/g' /etc/locale.gen
+      locale-gen
+      echo "LANG=$selected_locale" > /etc/locale.conf
       localectl set-locale $selected_locale
     else
       echo "Invalid locale entered, try again"
@@ -94,6 +127,9 @@ set_locale() {
   done
 }
 
+# User Input Required
+#
+# doesn't handle functions like partition labelling and etc (use a tool like Gparted for in the future)
 disk_formatting() {
   disks=$(lsblk)
 
@@ -112,10 +148,14 @@ disk_formatting() {
       cfdisk "/dev/$selected_disk"
     else
       echo "Invalid disk entered, try again"
+      read -p "Would you like to see all your disks and partitions again? (y/N): " answer
+      if [ $answer = "y" ] || [ $answer = "Y" ];
+        lsblk
+      fi
     fi
 
-    read -p "Have you finished partitioning your disks (y/N)? " answer
-    if [ $answer -eq "y" ] || [ $answer -eq "Y" ];
+    read -p "Have you finished partitioning your disk (y/N)? " answer
+    if [ $answer = "y" ] || [ $answer = "Y" ];
       break;
     fi
   done
@@ -137,7 +177,7 @@ disk_formatting() {
         echo "4) Fat32"
         echo
 
-        read -p "Which file system do you want to format this disk into? " answer
+        read -p "Which file system do you want to format this partition into? " answer
         case $answer in
           [1]* ) mkfs.ext4 "/dev/$selected_disk"; break;;
           [1]* ) mkfs.btrfs "/dev/$selected_disk"; break;;
@@ -148,29 +188,151 @@ disk_formatting() {
       done
     else
       echo "Invalid disk entered, try again"
+      read -p "Would you like to see all your disks and partitions again? (y/N): " answer
+      if [ $answer = "y" ] || [ $answer = "Y" ];
+        lsblk
+      fi
     fi
 
     read -p "Have you finished formatting your disks (y/N)? " answer
-    if [ $answer -eq "y" ] || [ $answer -eq "Y" ];
+    if [ $answer = "y" ] || [ $answer = "Y" ];
       break;
     fi
   done
 
+  echo "Mounting partitions"
   # mounting formatted drives
   formatted_partitions=$(lsblk -o +FSTYPE,PATH -r -i -n)
 
   # 6 = type, 8 = fstype, 9 = path
   for partition in $formatted_partitions; do
-    itemtype=$(formatted_partitions | awk '{print $6}')
-    fstype=$(formatted_partitions | awk '{print $8}')
-    path=$(formatted_partitions | awk '{print $9}')
+    itemtype=$(formatted_partitions | awk -F '[ ]' '{print $6}')
+    fstype=$(formatted_partitions | awk -F '[ ]' '{print $8}')
+    path=$(formatted_partitions | awk -F '[ ]' '{print $9}')
 
-    if [ $itemtype -eq 'part' ] || [ $itemtype -eq 'crypt' ];
-      if [ $fstype -eq 'vfat' ] || [ $fstype -eq 'ext4' ] || [ $fstype -eq 'btrfs' ];
+    # will assume any vfat partitions are meant for the bootloader
+    if [ $itemtype = 'part' ] || [ $itemtype = 'crypt' ];
+      if [ $fstype = 'vfat' ] || [ $fstype = 'ext4' ] || [ $fstype = 'btrfs' ];
         mount $path /mnt
-      elif [ $fstype -eq 'swap' ];
+      elif [ $fstype = 'vfat' ];
+        mkdir /mnt/boot
+        mount $path /mnt/boot
+      elif [ $fstype = 'swap' ];
         swapon $path /mnt
       fi
     fi
   done
+}
+
+configure_pacman() {
+  echo "Adjusting settings based on CPU core count"
+  echo "Also making more opinionated settings"
+
+  thread_count=$(cat /proc/cpuinfo | grep -m 1 siblings | awk -F ': ' '{print $2}')
+
+  # first, adjust parallel downloads to make full use of devices thread count
+  # should speed up download speed, assuming internet is also fast
+  sed --in-place 's/ParallelDownloads*/ParallelDownloads = $thread_count/g' /etc/pacman.conf
+  sed --in-place 's/#CheckSpace/CheckSpace/g' /etc/pacman.conf
+  sed --in-place 's/#DownloadUser = alpm/DownloadUser = alpm/g' /etc/pacman.conf
+  sed --in-place 's/#VerbosePkgLists/VerbosePkgLists/g' /etc/pacman.conf
+  sed --in-place 's/#Color/Color/g' /etc/pacman.conf
+  sed '/Color/a ILoveCandy' /etc/pacman.conf
+}
+
+# User Input Required
+# requires chroot into arch install first
+setup_package_configs() {
+  # pacstrapping necessary packages to install
+  echo "Package installation and config setup"
+
+  read -p "Do you want to enable AUR packages? (Y/n): " answer
+  if [ $answer != "N" ] || [ $answer != "n" ];
+    sed --in-place 's/#[multilib]\n#Include = /etc/pacman.conf/[multilib]\nInclude = /etc/pacman.conf/g'
+
+    # my chosen AUR helper is Paru, but can be changed post install
+    git clone https://aur.archlinux.org/paru.git
+    cd paru
+    makepkg -si
+    cd ../
+    rm -rf paru
+  fi
+}
+
+generate_fstab() {
+  genfstab -U /mnt > /mnt/etc/fstab
+}
+
+setup_root() {
+  pacstrap /mnt base base-devel linux linux-firmware git lvm2 vim nvim nano cryptsetup networkmanager zsh efibootmgr
+}
+
+# User Input Required
+# requires chroot into arch install first
+set_hostname() {
+  while true; do
+    read -p "Enter a system hostname: " hostname
+
+    read -p "Are you happy with the hostname $hostname? (y/N) " answer
+    if [ $answer = "y" ] || [ $answer = "Y" ];
+      echo $hostname > /etc/hostname
+    fi
+  done
+}
+
+# User Input Required
+# requires chroot into arch install first
+set_user_details() {
+  # setup root and local username / hostname and password
+  # also grant user root permissions
+  # will set shell to Zsh by default, although that can be changed post install
+
+  echo "Setting Sudoers details"
+  echo "Be very cafeful when modifying this file"
+  echo "Look for the line that contains '%wheel ALL=(ALL:ALL) ALL' and remove the '#' at the front."
+  read -p "Use Vim or Nano to edit this file? (1: Nano (default) | 2: Vim)" answer
+  if [ $answer -eq 2 ];
+    visudo
+  else
+    EDITOR=nano visudo
+  fi
+
+  while true; do
+    echo "Setting root user password"
+    passwd
+  done
+
+  while true; do
+    echo "Setting username and password"
+
+    read -p "Enter a username: " username
+
+    read -p "Are you happy with the username $username? (y/N) " answer
+    if [ $answer = "y" ] || [ $answer = "Y" ];
+      useradd -m -G wheel -s /bin/zsh $username
+
+      while true; do
+        read -p "Do you want to set a password? (y/N) " answer
+        if [ $answer = "y" ] || [ $answer = "Y" ];
+          echo "No password set for user: $username"
+          break
+        else
+          passwd $username
+        fi
+      done
+    fi
+  done
+}
+
+# User Input Required
+# requires chroot into arch install first
+setup_internet() {
+  # Not needed for devices connected to Ethernet
+  nmtui
+
+  systemctl enable NetworkManager
+}
+
+setup_bootloader() {
+
 }
