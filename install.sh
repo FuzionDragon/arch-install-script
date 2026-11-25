@@ -30,6 +30,39 @@ main() {
   echo "Ensure this system is either a VM or a fresh install of Arch Linux before you decide to use it."
   echo "The decisions made for this script are primarily for an opinionated installation and configuration of a single boot Arch Linux install."
   echo "It aims to be minimal and efficient, requiring minimal user input to "
+
+  echo
+  echo "Installation Options:"
+  echo "1) Manual"
+  echo "2) Auto"
+  echo "3) Exit (No Install)"
+  read -p "Selection: " selection
+
+  case $selection in
+    [1]* ) manual_setup; break;;
+    [2]* ) auto_setup; break;;
+    * ) echo "Exiting installer";;
+  esac
+}
+
+manual_setup() {
+  # setup checking vars
+  disk_formatted=false
+
+  while true; do
+    echo "Setup Options:"
+    echo "1) Disk Formatting"
+    echo "2) "
+    echo "3) Exit (No Install)"
+    read -p "Selection: " selection
+    case $selection in
+      [1]* ) disk_formatting; break;;
+      [2]* ) setup_internet; break;;
+      [3]* ) set_locale; break;;
+      [4]* ) set_keymap; break;;
+      * ) echo "Exiting installer";;
+    esac
+  done
 }
 
 # Based on my typical hardware, setup, and locale needs
@@ -40,11 +73,12 @@ main() {
 #
 # Will also setup the new install with my personal configs
 #
-full_auto_setup() {
+auto_setup() {
   disk_formatting
 
   echo "TwoFace" > /etc/hostname
 
+  timedatectl set-timezone Etc/GMT
   set_user_details
   setup_internet
 
@@ -56,6 +90,38 @@ full_auto_setup() {
 
   localectl set-keymap uk
   localectl set-locale LANG=en_GB.utf-8
+}
+
+set_timezone() {
+  timezones=$(timedatectl list-timezones)
+  current_zone=$(timedatectl | grep "Time zone" | awk -F ':' '{print $2}' | awk '{print $1}')
+
+  echo "Timezone setting..."
+  echo
+
+  read -p "Is the current timezone '$current_timezone' correct? (y/N): " answer
+  case $answer in
+    [Yy]* ) break;;
+    * ) echo "Current timezone not correct, listing valid options";;
+  esac
+
+  while true; do
+    read -p "Do you want to see the list of timezones? (y/N): " answer
+    if [ $answer = "y" ] || [ $answer = "Y" ];
+      echo "Listing timezone options"
+      echo "Use Up / Down arrows to scroll, press 'q' to exit"
+      $timezones | less
+    fi
+
+    read -p "Enter the desired timezone (case sensitive): " selected_timezone
+    in_list=$($timezones | grep -Fxq $selected_timezone && echo 1 || echo 0)
+    if [ $in_list -eq 1 ];
+      echo "Valid timezone selected"
+      timedatectl set-timezone $selected_timezone
+    else
+      echo "Invalid timezone entered, try again"
+    fi
+  done
 }
 
 set_keymap() {
