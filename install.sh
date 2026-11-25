@@ -16,10 +16,6 @@
 #
 # Checklist (based on Arch wiki guide)
 # - Encyption Option (Disk formatting option)
-# - System Clock
-# - Localization
-# - Time
-# - Network Config
 # - Bootloader (probably just Grub)
 #
 # After the last step, reboot. From there, the user can run the config setup script (or run it from here as an option)
@@ -41,28 +37,8 @@ main() {
   case $selection in
     [1]* ) manual_setup; break;;
     [2]* ) auto_setup; break;;
-    * ) echo "Exiting installer";;
+    * ) echo "Exiting installer"; return 0;;
   esac
-}
-
-manual_setup() {
-  # setup checking vars
-  disk_formatted=false
-
-  while true; do
-    echo "Setup Options:"
-    echo "1) Disk Formatting"
-    echo "2) "
-    echo "3) Exit (No Install)"
-    read -p "Selection: " selection
-    case $selection in
-      [1]* ) disk_formatting; break;;
-      [2]* ) setup_internet; break;;
-      [3]* ) set_locale; break;;
-      [4]* ) set_keymap; break;;
-      * ) echo "Exiting installer";;
-    esac
-  done
 }
 
 # Based on my typical hardware, setup, and locale needs
@@ -71,27 +47,112 @@ manual_setup() {
 #
 # Some settings require user input due to security reasons
 #
-# Will also setup the new install with my personal configs
-#
 auto_setup() {
-  disk_formatting
+  # pre root setup
+  setup_disk_formatting
 
   echo "TwoFace" > /etc/hostname
 
   timedatectl set-timezone Etc/GMT
-  set_user_details
+  setup_user_details
   setup_internet
 
-  setup_package_configs
   configure_pacman
 
   setup_root
   chroot /mnt
 
+  # system configuration
+  setup_package_configs
   localectl set-keymap uk
   localectl set-locale LANG=en_GB.utf-8
+  generate_fstab
 }
 
+manual_setup() {
+  # setup checking vars
+  #
+  # ps: forgive this awful code I will need to write for all these checks
+  
+  # Pre Root Setup
+  disk_formatted=" "
+  internet_setup=" "
+  hostname_setup=" "
+  user_details_setup=" "
+  timezone_setup=" "
+
+  all_complete=false
+
+  while true; do
+    echo "Initial Setup Options:"
+    echo "1) Disk Formatting [$disk_formatted]"
+    echo "2) Internet [$internet_setup]"
+    echo "3) Hostname [$hostname_setup]"
+    echo "4) Timezone [$timezone_setup]"
+    echo "5) User Details [$user_details_setup]"
+    if [ $all_complete = true ]; then
+      echo "10) Proceed to system configuration" 
+    else
+      echo "10) Proceed to system configuration [Not Available]" 
+    fi
+    echo "99) Exit Installer"
+
+    read -p "Choose an option: " selection
+    case $selection in
+      [1]* ) setup_disk_formatting && $disk_formatted="/";;
+      [2]* ) setup_internet && $internet_setup="/";;
+      [3]* ) setup_hostname && $hostname_setup="/";;
+      [4]* ) setup_timezone && $timezone_setup="/"; break;;
+      [5]* ) setup_user_details && $user_details_setup="/"; break;;
+      [10]* ) 
+          if [ $all_complete = true ]; then 
+            configure_pacman
+            setup_root
+            chroot /mnt
+            break
+          else 
+            echo "Please complete the rest of the setup before continuing."
+          fi ;;
+      [99]* ) echo "Exiting installer"; return 0;;
+      * ) echo "Select appropriate option";;
+    esac
+  done
+
+  # Post Root Setup
+  locale_setup=" "
+  keymap_setup=" "
+  package_setup=" "
+
+  all_complete=false
+
+  while true; do
+    echo "System Setup Options:"
+    echo "1) Locale [$timezone_setup]"
+    echo "2) Keymap [$keymap_setup]"
+    echo "3) Package Setup [$package_setup]"
+    if [ $all_complete = true ]; then
+      echo "10) Finish Installation" 
+    else
+      echo "10) Finish Installation [Not Available]" 
+    fi
+    echo "99) Exit Installer"
+
+    read -p "Choose an option: " selection
+    case $selection in
+      [1]* ) setup_locale && $locale_setup="/"; break;;
+      [2]* ) setup_keymap && $keymap_setup="/"; break;;
+      [3]* ) setup_package_configs && $package_setup="/"; break;;
+      [10]* ) 
+        generate_fstab
+        echo "Installation complete, run reboot and boot into your install."
+        ;;
+      [99]* ) echo "Exiting installer"; return 0;;
+      * ) echo "Select appropriate option";;
+    esac
+  done
+}
+
+# need to look into further, as proper way of setting up timezone requires a symlink to /usr/share/zoneinfo/* file into /etc/timezone, followed by hwclock --systohc command
 set_timezone() {
   timezones=$(timedatectl list-timezones)
   current_zone=$(timedatectl | grep "Time zone" | awk -F ':' '{print $2}' | awk '{print $1}')
@@ -119,12 +180,10 @@ set_timezone() {
       echo "Valid timezone selected"
       timedatectl set-timezone $selected_timezone
     else
-      echo "Invalid timezone entered, try again"
-    fi
   done
 }
 
-set_keymap() {
+setup_keymap() {
   keymaps=$(localectl list-keymaps)
   current_keymap=$(localectl | grep "VC Keymap" | awk -F ': ' '{print $2}')
 
@@ -158,7 +217,7 @@ set_keymap() {
 }
 
 # requires chroot into arch install first
-set_locale() {
+setup_locale() {
   locales=$(localectl list-locales)
   current_locale=$(localectl | grep "System Locale" | awk -F ': ' '{print $2}')
 
@@ -196,7 +255,7 @@ set_locale() {
 # User Input Required
 #
 # doesn't handle functions like partition labelling and etc (use a tool like Gparted for in the future)
-disk_formatting() {
+setup_disk_formatting() {
   disks=$(lsblk)
 
   echo "Disk Formatting"
@@ -314,7 +373,7 @@ setup_package_configs() {
 
   read -p "Do you want to enable AUR packages? (Y/n): " answer
   if [ $answer != "N" ] || [ $answer != "n" ];
-    sed --in-place 's/#[multilib]\n#Include = /etc/pacman.conf/[multilib]\nInclude = /etc/pacman.conf/g'
+    sed --in-place 's/#[multilib]\n#Include = /etc/pacman.conf/[multilib]\nInclude = /mnt/etc/pacman.conf/g'
 
     # my chosen AUR helper is Paru, but can be changed post install
     git clone https://aur.archlinux.org/paru.git
@@ -335,7 +394,7 @@ setup_root() {
 
 # User Input Required
 # requires chroot into arch install first
-set_hostname() {
+setup_hostname() {
   while true; do
     read -p "Enter a system hostname: " hostname
 
@@ -348,7 +407,7 @@ set_hostname() {
 
 # User Input Required
 # requires chroot into arch install first
-set_user_details() {
+setup_user_details() {
   # setup root and local username / hostname and password
   # also grant user root permissions
   # will set shell to Zsh by default, although that can be changed post install
