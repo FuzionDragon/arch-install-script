@@ -1,4 +1,4 @@
-# Arch Linux Setup Script
+# Arch Linux Installation Script
 
 An opinionated Arch Linux setup script, based on configurations I would do with some decision marking on behalf of the end user.
 
@@ -12,21 +12,11 @@ $ curl -fsSL https://raw.githubusercontent.com/FuzionDragon/arch-install-script/
 
 **Ensure that the contents of the script are read and verified first before running**
 
-### Checklist (based on Arch wiki guide)
-- Keymaps
-- Encyption Option
-- Password and Login
-- Internet
-- System Clock
-- Disk Picker / Partitioning
-- Disk Formatting
-- Disk Mounting
-- Root and Fstab
-- Localization
-- Time
-- Network Config
-- Root Password
-- Bootloader (probably just Grub)
+If you want to run the script directly instead of installing it first, run the following:
+
+```
+$ source <(curl -s https://raw.githubusercontent.com/FuzionDragon/arch-install-script/main/install.sh -o install.sh)
+```
 
 After the last step, reboot. From there, the user can run the config setup script (or run it from here as an option)
 

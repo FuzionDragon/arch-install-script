@@ -105,7 +105,7 @@ manual_setup() {
       [4]* ) setup_timezone && $timezone_setup="/"; break;;
       [5]* ) setup_user_details && $user_details_setup="/"; break;;
       [10]* ) 
-          if [ $all_complete = true ]; then 
+          if [ $all_complete = true ]; then
             configure_pacman
             setup_root
             chroot /mnt
@@ -168,7 +168,7 @@ set_timezone() {
 
   while true; do
     read -p "Do you want to see the list of timezones? (y/N): " answer
-    if [ $answer = "y" ] || [ $answer = "Y" ];
+    if [ $answer = "y" ] || [ $answer = "Y" ]; then
       echo "Listing timezone options"
       echo "Use Up / Down arrows to scroll, press 'q' to exit"
       $timezones | less
@@ -176,10 +176,10 @@ set_timezone() {
 
     read -p "Enter the desired timezone (case sensitive): " selected_timezone
     in_list=$($timezones | grep -Fxq $selected_timezone && echo 1 || echo 0)
-    if [ $in_list -eq 1 ];
+    if [ $in_list -eq 1 ]; then
       echo "Valid timezone selected"
       timedatectl set-timezone $selected_timezone
-    else
+    fi
   done
 }
 
@@ -198,7 +198,7 @@ setup_keymap() {
 
   while true; do
     read -p "Do you want to see the list of keymaps? (y/N): " answer
-    if [ $answer = "y" ] || [ $answer = "Y" ];
+    if [ $answer = "y" ] || [ $answer = "Y" ]; then
       echo "Listing valid keymaps"
       echo "Use Up / Down arrows to scroll, press 'q' to exit"
       $keymaps | less
@@ -206,7 +206,7 @@ setup_keymap() {
 
     read -p "Enter the desired keymap (case sensitive): " selected_keymap
     in_list=$($keymaps | grep -Fxq $selected_keymap && echo 1 || echo 0)
-    if [ $in_list -eq 1 ];
+    if [ $in_list -eq 1 ]; then
       echo "Valid keymap selected"
       echo "KEYMAP=$selected_keymap" > /etc/vconsole.conf
       localectl set-keymap $selected_keymap
@@ -232,7 +232,7 @@ setup_locale() {
 
   while true; do
     read -p "Do you want to see the list of locales? (y/N): " answer
-    if [ $answer = "y" ] || [ $answer = "Y" ];
+    if [ $answer = "y" ] || [ $answer = "Y" ]; then
       echo "Listing locales options"
       echo "Use Up / Down arrows to scroll, press 'q' to exit"
       $locales | less
@@ -240,7 +240,7 @@ setup_locale() {
 
     read -p "Enter the desired keymap (case sensitive): " selected_locale
     in_list=$($locales | grep -Fxq $selected_locale && echo 1 || echo 0)
-    if [ $in_list -eq 1 ];
+    if [ $in_list -eq 1 ]; then
       echo "Valid locale selected"
       sed --in-place 's/#$selected_locale/$selected_locale/g' /etc/locale.gen
       locale-gen
@@ -267,20 +267,20 @@ setup_disk_formatting() {
   while true; do
     read -p "Enter the disk you want to partition (case sensitive): " selected_disk
     in_list=$($disks | grep -Fxq $selected_disk && echo 1 || echo 0)
-    if [ $in_list -eq 1 ];
+    if [ $in_list -eq 1 ]; then
       echo "Valid disk selected"
       echo "Opening cfdisk..."
       cfdisk "/dev/$selected_disk"
     else
       echo "Invalid disk entered, try again"
       read -p "Would you like to see all your disks and partitions again? (y/N): " answer
-      if [ $answer = "y" ] || [ $answer = "Y" ];
+      if [ $answer = "y" ] || [ $answer = "Y" ]; then
         lsblk
       fi
     fi
 
     read -p "Have you finished partitioning your disk (y/N)? " answer
-    if [ $answer = "y" ] || [ $answer = "Y" ];
+    if [ $answer = "y" ] || [ $answer = "Y" ]; then
       break;
     fi
   done
@@ -290,7 +290,7 @@ setup_disk_formatting() {
     read -p "Enter the disk you want to partition (case sensitive): " selected_disk
     in_list=$($disks | grep -Fxq $selected_disk && echo 1 || echo 0)
 
-    if [ $in_list -eq 1 ];
+    if [ $in_list -eq 1 ]; then
       echo "Valid disk selected"
 
       while true; do
@@ -314,13 +314,13 @@ setup_disk_formatting() {
     else
       echo "Invalid disk entered, try again"
       read -p "Would you like to see all your disks and partitions again? (y/N): " answer
-      if [ $answer = "y" ] || [ $answer = "Y" ];
+      if [ $answer = "y" ] || [ $answer = "Y" ]; then
         lsblk
       fi
     fi
 
     read -p "Have you finished formatting your disks (y/N)? " answer
-    if [ $answer = "y" ] || [ $answer = "Y" ];
+    if [ $answer = "y" ] || [ $answer = "Y" ]; then
       break;
     fi
   done
@@ -336,13 +336,13 @@ setup_disk_formatting() {
     path=$(formatted_partitions | awk -F '[ ]' '{print $9}')
 
     # will assume any vfat partitions are meant for the bootloader
-    if [ $itemtype = 'part' ] || [ $itemtype = 'crypt' ];
-      if [ $fstype = 'vfat' ] || [ $fstype = 'ext4' ] || [ $fstype = 'btrfs' ];
+    if [ $itemtype = 'part' ] || [ $itemtype = 'crypt' ]; then
+      if [ $fstype = 'vfat' ] || [ $fstype = 'ext4' ] || [ $fstype = 'btrfs' ]; then
         mount $path /mnt
-      elif [ $fstype = 'vfat' ];
+      elif [ $fstype = 'vfat' ]; then
         mkdir /mnt/boot
         mount $path /mnt/boot
-      elif [ $fstype = 'swap' ];
+      elif [ $fstype = 'swap' ]; then
         swapon $path /mnt
       fi
     fi
@@ -372,7 +372,7 @@ setup_package_configs() {
   echo "Package installation and config setup"
 
   read -p "Do you want to enable AUR packages? (Y/n): " answer
-  if [ $answer != "N" ] || [ $answer != "n" ];
+  if [ $answer != "N" ] || [ $answer != "n" ]; then
     sed --in-place 's/#[multilib]\n#Include = /etc/pacman.conf/[multilib]\nInclude = /mnt/etc/pacman.conf/g'
 
     # my chosen AUR helper is Paru, but can be changed post install
@@ -399,7 +399,7 @@ setup_hostname() {
     read -p "Enter a system hostname: " hostname
 
     read -p "Are you happy with the hostname $hostname? (y/N) " answer
-    if [ $answer = "y" ] || [ $answer = "Y" ];
+    if [ $answer = "y" ] || [ $answer = "Y" ]; then
       echo $hostname > /etc/hostname
     fi
   done
@@ -413,10 +413,10 @@ setup_user_details() {
   # will set shell to Zsh by default, although that can be changed post install
 
   echo "Setting Sudoers details"
-  echo "Be very cafeful when modifying this file"
+  echo "Be very cafeful when modifying this file" 
   echo "Look for the line that contains '%wheel ALL=(ALL:ALL) ALL' and remove the '#' at the front."
   read -p "Use Vim or Nano to edit this file? (1: Nano (default) | 2: Vim)" answer
-  if [ $answer -eq 2 ];
+  if [ $answer -eq 2 ]; then
     visudo
   else
     EDITOR=nano visudo
@@ -433,12 +433,12 @@ setup_user_details() {
     read -p "Enter a username: " username
 
     read -p "Are you happy with the username $username? (y/N) " answer
-    if [ $answer = "y" ] || [ $answer = "Y" ];
+    if [ $answer = "y" ] || [ $answer = "Y" ]; then
       useradd -m -G wheel -s /bin/zsh $username
 
       while true; do
         read -p "Do you want to set a password? (y/N) " answer
-        if [ $answer = "y" ] || [ $answer = "Y" ];
+        if [ $answer = "y" ] || [ $answer = "Y" ]; then
           echo "No password set for user: $username"
           break
         else
@@ -459,5 +459,5 @@ setup_internet() {
 }
 
 setup_bootloader() {
-
+  echo test
 }
