@@ -256,21 +256,21 @@ setup_locale() {
 setup_disk_formatting() {
   echo "Disk Formatting"
   echo "Listing disks"
-  lsblk
+  lsblk -d
   
   # partitioning
   while true; do
     read -p "Enter the disk you want to partition (case sensitive): " selected_disk
-    in_list=$(lsblk | grep -Fxq $selected_disk && echo 1 || echo 0)
+    in_list=$(lsblk -r -d | awk '{print $1}' | grep -Fxq $selected_disk && echo 1 || echo 0)
     if [ $in_list -eq 1 ]; then
       echo "Valid disk selected"
       echo "Opening cfdisk..."
       cfdisk "/dev/$selected_disk"
     else
       echo "Invalid disk entered, try again"
-      read -p "Would you like to see all your disks and partitions again? (y/N): " answer
+      read -p "Would you like to see all your disks again? (y/N): " answer
       if [ $answer = "y" ] || [ $answer = "Y" ]; then
-        lsblk
+        lsblk -d
       fi
     fi
 
@@ -283,7 +283,7 @@ setup_disk_formatting() {
   # normal formatting
   while true; do
     read -p "Enter the disk you want to partition (case sensitive): " selected_disk
-    in_list=$(lsblk | grep -Fxq $selected_disk && echo 1 || echo 0)
+    in_list=$(lsblk -r | awk '{print $1}' | grep -Fxq $selected_disk && echo 1 || echo 0)
 
     if [ $in_list -eq 1 ]; then
       echo "Valid disk selected"
