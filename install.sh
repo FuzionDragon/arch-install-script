@@ -280,6 +280,9 @@ setup_disk_formatting() {
     fi
   done
 
+  echo "Listing disk partitions"
+  lsblk
+
   # normal formatting
   while true; do
     read -p "Enter the disk you want to partition (case sensitive): " selected_disk
@@ -313,6 +316,9 @@ setup_disk_formatting() {
         lsblk
       fi
     fi
+
+    echo "Current partitions made to disks"
+    lsblk
 
     read -p "Have you finished formatting your disks (y/N)? " answer
     if [ $answer = "y" ] || [ $answer = "Y" ]; then
