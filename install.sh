@@ -184,7 +184,6 @@ set_timezone() {
 }
 
 setup_keymap() {
-  keymaps=$(localectl list-keymaps)
   current_keymap=$(localectl | grep "VC Keymap" | awk -F ': ' '{print $2}')
 
   echo "Keymap setting..."
@@ -201,11 +200,11 @@ setup_keymap() {
     if [ $answer = "y" ] || [ $answer = "Y" ]; then
       echo "Listing valid keymaps"
       echo "Use Up / Down arrows to scroll, press 'q' to exit"
-      $keymaps | less
+      localectl list-keymaps | less
     fi
 
     read -p "Enter the desired keymap (case sensitive): " selected_keymap
-    in_list=$($keymaps | grep -Fxq $selected_keymap && echo 1 || echo 0)
+    in_list=$(localectl list-keymaps | grep -Fxq $selected_keymap && echo 1 || echo 0)
     if [ $in_list -eq 1 ]; then
       echo "Valid keymap selected"
       echo "KEYMAP=$selected_keymap" > /etc/vconsole.conf
@@ -218,7 +217,6 @@ setup_keymap() {
 
 # requires chroot into arch install first
 setup_locale() {
-  locales=$(localectl list-locales)
   current_locale=$(localectl | grep "System Locale" | awk -F ': ' '{print $2}')
 
   echo "Locale setting..."
@@ -235,11 +233,11 @@ setup_locale() {
     if [ $answer = "y" ] || [ $answer = "Y" ]; then
       echo "Listing locales options"
       echo "Use Up / Down arrows to scroll, press 'q' to exit"
-      $locales | less
+      localectl list-locales | less
     fi
 
     read -p "Enter the desired keymap (case sensitive): " selected_locale
-    in_list=$($locales | grep -Fxq $selected_locale && echo 1 || echo 0)
+    in_list=$(localectl list-locales | grep -Fxq $selected_locale && echo 1 || echo 0)
     if [ $in_list -eq 1 ]; then
       echo "Valid locale selected"
       sed --in-place 's/#$selected_locale/$selected_locale/g' /etc/locale.gen
@@ -256,17 +254,14 @@ setup_locale() {
 #
 # doesn't handle functions like partition labelling and etc (use a tool like Gparted for in the future)
 setup_disk_formatting() {
-  disks=$(lsblk)
-
   echo "Disk Formatting"
   echo "Listing disks"
-  echo
-  echo $disks
+  lsblk
   
   # partitioning
   while true; do
     read -p "Enter the disk you want to partition (case sensitive): " selected_disk
-    in_list=$($disks | grep -Fxq $selected_disk && echo 1 || echo 0)
+    in_list=$(lsblk | grep -Fxq $selected_disk && echo 1 || echo 0)
     if [ $in_list -eq 1 ]; then
       echo "Valid disk selected"
       echo "Opening cfdisk..."
@@ -288,7 +283,7 @@ setup_disk_formatting() {
   # normal formatting
   while true; do
     read -p "Enter the disk you want to partition (case sensitive): " selected_disk
-    in_list=$($disks | grep -Fxq $selected_disk && echo 1 || echo 0)
+    in_list=$(lsblk | grep -Fxq $selected_disk && echo 1 || echo 0)
 
     if [ $in_list -eq 1 ]; then
       echo "Valid disk selected"
@@ -458,6 +453,10 @@ setup_internet() {
   systemctl enable NetworkManager
 }
 
+# wip
 setup_bootloader() {
   echo test
 }
+
+# Entrypoint
+main
